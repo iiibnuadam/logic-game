@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        background: maroon;
+        color: white;
+        font-family: sans-serif;
+        font-size: 18px;
+        font-weight: 600;
+      }
+      canvas {
+        border: 2px solid #000;
+      }
+      .bottom-canvas {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .container {
+        width: 400px;
+        margin: 0 auto;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        height: 95vh;
+      }
+      #modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        justify-content: center;
+        align-items: center;
+      }
+      #modal-content {
+        background: #fff;
+        padding: 20px;
+        border-radius: 5px;
+        width: 80%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      #modal-content h2{
+        color: black;
+      }
+      #modal-content button {
+        padding: 8px 32px;
+        border: none;
+        background: red;
+        border-radius: 4px;
+        color: white;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .container-btn-move {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .container-btn-move button {
+        padding: 8px 20px;
+        border: none;
+        background: gray;
+        border-radius: 4px;
+        color: white;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .container-btn-move button:hover {
+        background: red;
+      }
+      .container-btn-up-down {
+        display: flex;
+        justify-content: center;
+      }
+      .container-btn-side {
+        display: flex;
+        justify-content: center;
+      }
+      .container-btn-side .btn-side {
+        display: flex;
+        justify-content: space-between;
+        width: 200px;
+      }
+    </style>
+    <title>Logic Test</title>
+  </head>
+  <body>
+    <div class="container">
+      <div>  
+        <div class="container-canvas"></div>
+        <div class="bottom-canvas">
+          <p id="countdown">00:00</p>
+          <p>Total: <span id="point">0</span></p>
+        </div>
+      </div>
+      <div class="container-btn-move">
+        <div class="container-btn-up-down">
+          <button onclick="move('up')">
+           &#5169;
+          </button>
+        </div>
+        <div class="container-btn-side">
+          <div class="btn-side">
+            <button onclick="move('left')">&#5176;</button>
+            <button onclick="move('right')">&#5171;</button>
+          </div>
+        </div>
+        <div class="container-btn-up-down">
+          <button onclick="move('down')">&#5167;</button>
+        </div>
+      </div>
+
+    <div id="modal">
+      <div id="modal-content">
+        <h2>Your points: <span id="final-point">0</span></h2>
+        <button onclick="retryGame()">Retry</button>
+      </div>
+    </div>
+
+    <script>
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      // set canvas size
+      const canvasWidth = 400;
+      const canvasHeight = 400;
+
+      // set array size
+      const rows = 6;
+      const cols = 6;
+      const cellSize = canvasWidth / cols;
+
+      // grid storage
+      const grid = [
+        [1, 1, 1, 1, 1, 1],
+        [1, 0, 0, 0, 0, 1],
+        [1, 0, 1, 1, 1, 1],
+        [1, 1, 1, 1, 0, 1],
+        [1, 0, 1, 1, 0, 1],
+        [1, 1, 1, 1, 1, 1],
+      ];
+
+      // active cell position (baris, kolom)
+      let activeCell = { row: 2, col: 2 };
+
+      // yellow cell position (baris, kolom)
+      let yellowCell = { row: -1, col: -1 };
+
+      // points
+      let point = 0;
+
+      // countdown
+      let timeRemaining = 60;
+      let countdownInterval;
+
+      // draw grid dan sel
+      function drawGrid() {
+        for (let i = 0; i < rows; i++) {
+          for (let j = 0; j < cols; j++) {
+            const x = j * cellSize;
+            const y = i * cellSize;
+
+            // set border in every cell
+            ctx.strokeStyle = grid[i][j] === 0 ? "#800000" : "#000";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(x, y, cellSize, cellSize);
+
+            // set background color in every cell
+            ctx.fillStyle = grid[i][j] === 0 ? "#800000" : "#FFFFFF";
+            ctx.fillRect(x, y, cellSize, cellSize);
+
+            // set active cell color
+            if (
+              i === activeCell.row &&
+              j === activeCell.col &&
+              grid[i][j] === 1
+            ) {
+              ctx.fillStyle = "#0000FF";
+              ctx.fillRect(x, y, cellSize, cellSize);
+            }
+
+            // set yellow cell color
+            if (i === yellowCell.row && j === yellowCell.col) {
+              ctx.fillStyle = "#FFFF00";
+              ctx.fillRect(x, y, cellSize, cellSize);
+            }
+          }
+        }
+      }
+
+      // draw grid dan sel at the beginning
+      function draw() {
+        drawGrid();
+        updatePoint();
+      }
+
+      // draw a canvas and call draw function
+      function createCanvas() {
+        const contaainerCanvas = document.querySelector(".container-canvas");
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        contaainerCanvas.appendChild(canvas);
+        draw();
+      }
+
+      // direction active cell : up, down, left, right
+      function move(direction) {
+        switch (direction) {
+          case "up":
+            if (
+              activeCell.row > 0 &&
+              grid[activeCell.row - 1][activeCell.col] === 1
+            ) {
+              activeCell.row--;
+            }
+            break;
+          case "down":
+            if (
+              activeCell.row < rows - 1 &&
+              grid[activeCell.row + 1][activeCell.col] === 1
+            ) {
+              activeCell.row++;
+            }
+            break;
+          case "left":
+            if (
+              activeCell.col > 0 &&
+              grid[activeCell.row][activeCell.col - 1] === 1
+            ) {
+              activeCell.col--;
+            }
+            break;
+          case "right":
+            if (
+              activeCell.col < cols - 1 &&
+              grid[activeCell.row][activeCell.col + 1] === 1
+            ) {
+              activeCell.col++;
+            }
+            break;
+        }
+
+        checkCollision();
+        draw();
+      }
+
+      // check collision between active cell and yellow cell
+      function checkCollision() {
+        if (
+          activeCell.row === yellowCell.row &&
+          activeCell.col === yellowCell.col &&
+          grid[activeCell.row][activeCell.col] === 1
+        ) {
+          generateRandomYellowCell();
+          point += 100;
+        }
+      }
+
+      // update point
+      function updatePoint() {
+        document.getElementById("point").innerText = point;
+      }
+
+      // generate random position for yellow cell
+      function generateRandomYellowCell() {
+        let availableCells = [];
+
+        // find available white cell
+        for (let i = 0; i < rows; i++) {
+          for (let j = 0; j < cols; j++) {
+            if (
+              grid[i][j] === 1 &&
+              (i !== activeCell.row || j !== activeCell.col)
+            ) {
+              availableCells.push({ row: i, col: j });
+            }
+          }
+        }
+
+        // select random white cell
+        if (availableCells.length > 0) {
+          const randomIndex = Math.floor(Math.random() * availableCells.length);
+          yellowCell = availableCells[randomIndex];
+        } else {
+          // if no white cell, reset yellow cell position
+          yellowCell = { row: -1, col: -1 };
+        }
+      }
+
+      // format time in minutes:seconds
+      function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes < 10 ? "0" : ""}${minutes}:${
+          remainingSeconds < 10 ? "0" : ""
+        }${remainingSeconds}`;
+      }
+
+      // initialize canvas and event listener to move the cell
+      createCanvas();
+
+      // gemerate initial position for yellow cell
+      generateRandomYellowCell();
+
+      // initial countdown timer
+      countdownInterval = setInterval(function () {
+        timeRemaining--;
+        document.getElementById("countdown").innerText =
+          formatTime(timeRemaining);
+        if (timeRemaining <= 0) {
+          clearInterval(countdownInterval);
+          showGameOverModal();
+        }
+      }, 1000);
+
+      function showGameOverModal() {
+        document.getElementById("final-point").innerText = point;
+        document.getElementById("modal").style.display = "flex";
+      }
+
+      function retryGame() {
+        // reset variable and point
+        activeCell = { row: 2, col: 2 };
+        generateRandomYellowCell();
+        point = 0;
+        timeRemaining = 60;
+        document.getElementById("modal").style.display = "none";
+        clearInterval(countdownInterval);
+        countdownInterval = setInterval(function () {
+          timeRemaining--;
+          document.getElementById("countdown").innerText =
+            formatTime(timeRemaining);
+          if (timeRemaining <= 0) {
+            clearInterval(countdownInterval);
+            showGameOverModal();
+          }
+        }, 1000);
+
+        // redraw canvas
+        draw();
+      }
+
+      window.addEventListener("keydown", function (e) {
+        switch (e.key) {
+          case "ArrowUp":
+            move("up");
+            break;
+          case "ArrowDown":
+            move("down");
+            break;
+          case "ArrowLeft":
+            move("left");
+            break;
+          case "ArrowRight":
+            move("right");
+            break;
+        }
+      });
+    </script>
+  </body>
+</html>
